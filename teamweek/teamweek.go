@@ -1,173 +1,191 @@
 package teamweek
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
+)
+
+const (
+	libraryVersion = "0.1"
+	userAgent      = "go-teamweek/" + libraryVersion
+	defaultBaseURL = "https://new.teamweek.com/api/v3/"
 )
 
 type (
-	Workspace struct {
-		ID          int64  `json:"id,omitempty"`
-		Name        string `json:"name,omitempty"`
-		Active      bool   `json:"active,omitempty"`
-		Role        string `json:"role,omitempty"`
-		SuspendedAt string `json:"suspended_at,omitempty"`
-		CreatedAt   string `json:"created_at,omitempty"`
-		UpdatedAt   string `json:"updated_at,omitempty"`
+	Client struct {
+		client    *http.Client
+		BaseURL   *url.URL
+		UserAgent string
 	}
 
-	UserProfile struct {
-		ID         int64       `json:"id,omitempty"`
-		Name       string      `json:"name,omitempty"`
-		Email      string      `json:"email,omitempty"`
-		Color      string      `json:"color,omitempty"`
-		ColorID    int64       `json:"color_id,omitempty"`
-		Initials   string      `json:"initials,omitempty"`
-		PictureUrl string      `json:"picture_url,omitempty"`
-		HasPicture bool        `json:"has_picture,omitempty"`
-		Workspaces []Workspace `json:"workspaces,omitempty"`
-		ProjectIDs []int64     `json:"project_ids,omitempty`
-		CreatedAt  string      `json:"created_at,omitempty"`
-		UpdatedAt  string      `json:"updated_at,omitempty"`
+	Account struct {
+		ID          int64   `json:"id,omitempty"`
+		Name        string  `json:"name,omitempty"`
+		IsDemo      bool    `json:"is_demo,omitempty"`
+		SuspendedAt string  `json:"suspended_at,omitempty"`
+		Groups      []Group `json:"groups,omitempty"`
 	}
 
-	Member struct {
-		Role              string `json:"role,omitempty"`
-		Active            bool   `json:"active,omitempty"`
-		Color             string `json:"color,omitempty"`
-		ColorID           int64  `json:"color_id,omitempty"`
-		HoursPerWorkDay   string `json:"hours_per_work_day,omitempty"`
-		MinutesPerWorkDay string `json:"minutes_per_work_day,omitempty"`
-		Dummy             bool   `json:"dummy,omitempty"`
-		PictureUrl        string `json:"picture_url,omitempty"`
-		HasPicture        bool   `json:"has_picture,omitempty"`
-		ActivatedAt       string `json:"activated_at,omitempty"`
-		DeactivatedAt     string `json:"deactivated_at,omitempty"`
-		ID                int64  `json:"id,omitempty"`
-		Name              string `json:"name,omitempty"`
-		Email             string `json:"email,omitempty"`
-		Initials          string `json:"initials,omitempty"`
-		CreatedAt         string `json:"created_at,omitempty"`
-		UpdatedAt         string `json:"updated_at,omitempty"`
+	Profile struct {
+		ID          int64         `json:"id,omitempty"`
+		Email       string        `json:"email,omitempty"`
+		Name        string        `json:"name,omitempty"`
+		Initials    string        `json:"initials,omitempty"`
+		PictureUrl  string        `json:"picture_url,omitempty"`
+		HasPicture  bool          `json:"has_picture,omitempty"`
+		Color       string        `json:"color,omitempty"`
+		Accounts    []Account     `json:"accounts,omitempty"`
+		Invitations []interface{} `json:"invitations,omitempty"`
+		CreatedAt   string        `json:"created_at,omitempty"`
+		UpdatedAt   string        `json:"updated_at,omitempty"`
 	}
 
-	Task struct {
-		ID               int64    `json:"id,omitempty"`
-		Name             string   `json:"name,omitempty"`
-		Notes            string   `json:"notes,omitempty"`
-		StartDate        string   `json:"start_date,omitempty"`
-		EndDate          string   `json:"end_date,omitempty"`
-		StartTime        string   `json:"start_time,omitempty"`
-		EndTime          string   `json:"end_time,omitempty"`
-		Color            string   `json:"color,omitempty"`
-		ColorID          int64    `json:"color_id,omitempty"`
-		EstimatedMinutes int64    `json:"estimated_minutes,omitempty"`
-		Done             bool     `json:"done,omitempty"`
-		Pined            bool     `json:"pinned,omitempty"`
-		UserID           int64    `json:"user_id,omitempty"`
-		FolderID         int64    `json:"folder_id,omitempty"`
-		Position         int64    `json:"position,omitempty"`
-		Weight           int64    `json:"weight,omitempty"`
-		ProjectID        int64    `json:"project_id,omitempty"`
-		Project          *Project `json:"project,omitempty"`
-		CreatedAt        string   `json:"created_at,omitempty"`
-		UpdatedAt        string   `json:"updated_at,omitempty"`
-	}
-
-	Milestone struct {
-		ID        int64  `json:"id,omitempty"`
-		Name      string `json:"name,omitempty"`
-		Color     string `json:"color,omitempty"`
-		ColorID   int64  `json:"color_id,omitempty"`
-		Date      string `json:"date,omitempty"`
-		Done      bool   `json:"done,omitempty"`
-		Holiday   bool   `json:"holiday,omitempty"`
-		GroupID   int64  `json:"group_id,omitempty"`
-		CreatedAt string `json:"created_at,omitempty"`
-		UpdatedAt string `json:"updated_at,omitempty"`
+	User struct {
+		ID         int64  `json:"id,omitempty"`
+		Email      string `json:"email,omitempty"`
+		Name       string `json:"name,omitempty"`
+		Initials   string `json:"initials,omitempty"`
+		PictureUrl string `json:"picture_url,omitempty"`
+		HasPicture bool   `json:"has_picture,omitempty"`
+		Color      string `json:"color,omitempty"`
+		Weight     int64  `json:"weight,omitempty"`
+		Dummy      bool   `json:"dummy,omitempty"`
 	}
 
 	Project struct {
-		ID        int64  `json:"id,omitempty"`
-		Name      string `json:"name,omitempty"`
-		Color     string `json:"color,omitempty"`
-		ColorID   string `json:"color_id,omitempty"`
-		CreatedAt string `json:"created_at,omitempty"`
-		UpdatedAt string `json:"updated_at,omitempty"`
+		ID    int64  `json:"id,omitempty"`
+		Name  string `json:"name,omitempty"`
+		Color string `json:"color,omitempty"`
 	}
 
-	Membership struct {
-		ID        int64  `json:"id,omitempty"`
-		UserID    int64  `json:"user_id,omitempty"`
-		Position  int64  `json:"position,omitempty"`
-		Weight    int64  `json:"weight,omitempty"`
-		CreatedAt string `json:"created_at,omitempty"`
-		UpdatedAt string `json:"updated_at,omitempty"`
+	Task struct {
+		ID             int64    `json:"id,omitempty"`
+		Name           string   `json:"name,omitempty"`
+		StartDate      string   `json:"start_date,omitempty"`
+		EndDate        string   `json:"end_date,omitempty"`
+		StartTime      string   `json:"start_time,omitempty"`
+		EndTime        string   `json:"end_time,omitempty"`
+		Color          string   `json:"color,omitempty"`
+		EstimatedHours float64  `json:"estimated_hours,omitempty"`
+		Pinned         bool     `json:"pinned,omitempty"`
+		Done           bool     `json:"done,omitempty"`
+		UserID         int64    `json:"user_id,omitempty"`
+		Project        *Project `json:"project,omitempty"`
+	}
+
+	Milestone struct {
+		ID      int64  `json:"id,omitempty"`
+		Name    string `json:"name,omitempty"`
+		Date    string `json:"date,omitempty"`
+		Done    bool   `json:"done,omitempty"`
+		Holiday bool   `json:"holiday,omitempty"`
 	}
 
 	Group struct {
-		ID          int64        `json:"id,omitempty"`
-		Name        string       `json:"name,omitempty"`
-		Memberships []Membership `json:"memberships,omitempty"`
-		CreatedAt   string       `json:"created_at,omitempty"`
-		UpdatedAt   string       `json:"updated_at,omitempty"`
+		ID         int64        `json:"id,omitempty"`
+		Name       string       `json:"name,omitempty"`
+		AccountID  int64        `json:"account_id,omitempty"`
+		Membership []Membership `json:"memberships,omitempty"`
+	}
+
+	Membership struct {
+		ID      int64 `json:"id,omitempty"`
+		GroupID int64 `json:"group_id,omitempty"`
+		UserID  int64 `json:"user_id,omitempty"`
+		Weight  int64 `json:"weight,omitempty"`
 	}
 )
 
-func (c *Client) GetUserProfile() (*UserProfile, error) {
-	profile := UserProfile{}
-
-	if err := c.get("me", &profile); err != nil {
-		return nil, err
-	}
-	return &profile, nil
+func (c *Client) Profile() (*Profile, error) {
+	profile := new(Profile)
+	err := c.Request("me.json", profile)
+	return profile, err
 }
 
-func (c *Client) ListWorkspaceMembers(workspaceID int64) ([]Member, error) {
-	members := []Member{}
-	url := fmt.Sprintf("%d/members", workspaceID)
-
-	if err := c.get(url, &members); err != nil {
-		return nil, err
-	}
-	return members, nil
+func (c *Client) ListAccounts() ([]Account, error) {
+	accounts := new([]Account)
+	err := c.Request("me/accounts.json", accounts)
+	return *accounts, err
 }
 
-func (c *Client) ListWorkspaceProjects(workspaceID int64) ([]Project, error) {
-	projects := []Project{}
-	url := fmt.Sprintf("%d/projects", workspaceID)
-
-	if err := c.get(url, &projects); err != nil {
-		return nil, err
-	}
-	return projects, nil
+func (c *Client) ListAccountUsers(accountID int64) ([]User, error) {
+	users := new([]User)
+	err := c.Request(fmt.Sprintf("%d/users.json", accountID), users)
+	return *users, err
 }
 
-func (c *Client) ListWorkspaceMilestones(workspaceID int64) ([]Milestone, error) {
-	milestones := []Milestone{}
-	url := fmt.Sprintf("%d/milestones", workspaceID)
-
-	if err := c.get(url, &milestones); err != nil {
-		return nil, err
-	}
-	return milestones, nil
+func (c *Client) ListAccountProjects(accountID int64) ([]Project, error) {
+	projects := new([]Project)
+	err := c.Request(fmt.Sprintf("%d/projects.json", accountID), projects)
+	return *projects, err
 }
 
-func (c *Client) ListWorkspaceGroups(workspaceID int64) ([]Group, error) {
-	groups := []Group{}
-	url := fmt.Sprintf("%d/groups", workspaceID)
-
-	if err := c.get(url, &groups); err != nil {
-		return nil, err
-	}
-	return groups, nil
+func (c *Client) ListAccountMilestones(accountID int64) ([]Milestone, error) {
+	milestones := new([]Milestone)
+	err := c.Request(fmt.Sprintf("%d/milestones.json", accountID), milestones)
+	return *milestones, err
 }
 
-func (c *Client) ListWorkspaceTasks(workspaceID int64) ([]Task, error) {
-	tasks := []Task{}
-	url := fmt.Sprintf("%d/tasks", workspaceID)
+func (c *Client) ListAccountGroups(accountID int64) ([]Group, error) {
+	groups := new([]Group)
+	err := c.Request(fmt.Sprintf("%d/groups.json", accountID), groups)
+	return *groups, err
+}
 
-	if err := c.get(url, &tasks); err != nil {
-		return nil, err
+func (c *Client) ListAccountTasks(accountID int64) ([]Task, error) {
+	tasks := new([]Task)
+	err := c.Request(fmt.Sprintf("%d/tasks.json", accountID), tasks)
+	return *tasks, err
+}
+
+func NewClient(httpClient *http.Client) *Client {
+	if httpClient == nil {
+		httpClient = http.DefaultClient
 	}
-	return tasks, nil
+	baseURL, _ := url.Parse(defaultBaseURL)
+	client := &Client{client: httpClient, BaseURL: baseURL, UserAgent: userAgent}
+	return client
+}
+
+func handleResponseStatuses(resp *http.Response) error {
+	if resp.StatusCode >= 500 {
+		return errors.New("Teamweek API experienced an internal error. Please try again later.")
+	}
+	if resp.StatusCode == 400 {
+		return errors.New("Malformed request sent.")
+	}
+	if resp.StatusCode == 401 || resp.StatusCode == 403 {
+		return errors.New("Authorization error. Please check credentials and/or reauthenticate.")
+	}
+	if (resp.StatusCode > 200 && resp.StatusCode < 300) || resp.StatusCode > 403 {
+		return fmt.Errorf("Teamweek API returned an unexpected status code: %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+func (c *Client) Request(urlStr string, v interface{}) error {
+	rel, err := url.Parse(urlStr)
+	if err != nil {
+		return err
+	}
+	u := c.BaseURL.ResolveReference(rel)
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Add("User-Agent", c.UserAgent)
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if err := handleResponseStatuses(resp); err != nil {
+		return err
+	}
+
+	return json.NewDecoder(resp.Body).Decode(v)
 }
